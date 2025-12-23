@@ -1,0 +1,115 @@
+# BASIC
+
+# 1. Update with RETURNING (Edit & Fetch)
+mutation EditReviewContent($id: Int!, $newContent: String!) @auth(level: USER) {
+  updatedReview: _selectFirst(
+    sql: """
+      UPDATE review 
+      SET content = $2 
+      WHERE id = $1 
+      RETURNING id, content, rating
+    """, 
+    params: [$id, $newContent]
+  )
+}
+
+# 2. Bulk Delete (Execute only)
+mutation DeleteSpamReviews($keyword: String!) @auth(level: USER) {
+  _execute(
+    sql: "DELETE FROM review WHERE content LIKE '%' || $1 || '%'",
+    params: [$keyword]
+  )
+}
+
+# 3. Soft Delete Pattern
+mutation SoftDeleteRestaurant($id: Int!) @auth(level: USER) {
+  _selectFirst(
+    sql: """
+      UPDATE restaurant 
+      SET active = false 
+      WHERE id = $1 
+      RETURNING id, name, active
+    """,
+    params: [$id]
+  )
+}
+
+# ADVANCED LOGIC
+
+# 4. Transaction Simulation (Move Foreign Key)
+mutation MoveReview($reviewId: Int!, $newRestaurantId: Int!) @auth(level: USER) {
+  _selectFirst(
+    sql: "UPDATE review SET restaurant_id = $2 WHERE id = $1 RETURNING *",
+    params: [$reviewId, $newRestaurantId]
+  )
+}
+
+# 5. JSON Column Update (Full Object Replacement)
+mutation UpdateMetadata($id: Int!, $newMeta: Any!) @auth(level: USER) {
+  _selectFirst(
+    sql: "UPDATE restaurant SET metadata = $2 WHERE id = $1 RETURNING metadata",
+    params: [$id, $newMeta]
+  )
+}
+
+# 6. Date Interval Math
+mutation ExtendSubscription @auth(level: USER) {
+  _execute(
+    sql: "UPDATE review SET created_at = created_at + INTERVAL '1 month' WHERE rating > 4"
+  )
+}
+
+# 7. Upsert (Insert ON CONFLICT Update)
+mutation UpsertReview($id: Int!, $content: String!) @auth(level: USER) {
+  _selectFirst(
+    sql: """
+      INSERT INTO review (id, restaurant_id, rating, content)
+      VALUES ($1, 1, 5, $2)
+      ON CONFLICT (id) 
+      DO UPDATE SET content = EXCLUDED.content
+      RETURNING id, content, 'upserted' as action
+    """,
+    params: [$id, $content]
+  )
+}
+
+# COMPLEX & CTEs
+
+# 8. Atomic Nuke (Multi-table CTE Delete)
+mutation NuclearDeleteRestaurant($id: Int!) @auth(level: USER) {
+  _execute(
+    sql: """
+      WITH deleted_reviews AS (
+        DELETE FROM review WHERE restaurant_id = $1 RETURNING id
+      )
+      DELETE FROM restaurant WHERE id = $1
+    """,
+    params: [$id]
+  )
+}
+
+# 9. Array Appending (Postgres Specific)
+mutation AddTag($id: Int!, $tag: String!) @auth(level: USER) {
+  _selectFirst(
+    sql: """
+      UPDATE restaurant 
+      SET tags = array_append(tags, $2) 
+      WHERE id = $1 
+      RETURNING tags
+    """,
+    params: [$id, $tag]
+  )
+}
+
+# SECURITY
+
+# 10. Secure Update (Owns Resource)
+# Test: Update Restaurant
+# Expected: SUCCESS with authenticated and FAILURE otherwise.
+mutation SecureUpdateMyRestaurant($id: Int!, $active: Boolean!) @auth(level: USER) {
+  _selectFirst(
+    sql: "UPDATE restaurant SET active = $2 WHERE id = $1 AND owner_uid = $3 RETURNING id, active, owner_uid",
+    # $3 is securely injected from the Auth Token
+    params: [$id, $active, {_expr: "auth.uid"}]
+  )
+}

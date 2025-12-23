@@ -1,0 +1,116 @@
+# Copyright 2024 Google LLC
+# Licensed under the Apache License, Version 2.0.
+
+mutation SeedRestaurants {
+  # RESTAURANTS
+  
+  # 1. Cuppa Joe: OWNED BY YOU (The Emulator User)
+  # We use "exampleUserId" because that is the default UID in the Local Emulator.
+  r1: restaurant_insert(data: {
+    id: 1, 
+    name: "Cuppa Joe", 
+    ownerUid: "exampleUserId",   # <--- CRITICAL CHANGE FOR TESTING
+    active: true,
+    metadata: { type: "cafe", wifi: true, seating: 20 }, 
+    tags: ["coffee", "breakfast", "cozy"]
+  })
+  
+  # 2. Pizza Planet: OWNED BY SOMEONE ELSE
+  # This lets us test that we CANNOT update it.
+  r2: restaurant_insert(data: {
+    id: 2, 
+    name: "Pizza Planet", 
+    ownerUid: "user2", 
+    active: true,
+    metadata: { type: "chain", delivery: true, franchise_id: 99 }, 
+    tags: ["fast_food", "pizza", "late_night"]
+  })
+
+  # 3. Taco Town: The "Ghost" Kitchen
+  r3: restaurant_insert(data: {
+    id: 3, 
+    name: "Taco Town", 
+    ownerUid: "user3", 
+    active: false,
+    metadata: { type: "street_food", permit_expired: true },
+    tags: ["taco", "spicy"]
+  })
+
+  # ----------------------------------------------------------------
+  # REVIEWS (Standard data)
+  # ----------------------------------------------------------------
+  rev1: review_insert(data: {
+    id: 1, restaurantId: 1, rating: 5, content: "Absolutely fantastic espresso!", 
+    createdAt: "2025-01-01T08:00:00Z", visitDate: "2025-01-01"
+  })
+  rev2: review_insert(data: {
+    id: 2, restaurantId: 1, rating: 5, content: "Best breakfast burrito in town.", 
+    createdAt: "2025-01-02T09:30:00Z", visitDate: "2025-01-02"
+  })
+  rev3: review_insert(data: {
+    id: 3, restaurantId: 1, rating: 4, content: "Good coffee, but loud music.", 
+    createdAt: "2025-01-05T10:00:00Z", visitDate: "2025-01-05"
+  })
+  rev4: review_insert(data: {
+    id: 4, restaurantId: 1, rating: 4.5, content: "Remote work heaven. Wifi is fast.", 
+    createdAt: "2024-01-01T10:00:00Z", visitDate: "2023-12-31" 
+  })
+  rev5: review_insert(data: {
+    id: 5, restaurantId: 1, rating: 5, content: "Love the owner, super friendly.", 
+    createdAt: "2025-01-10T11:00:00Z", visitDate: "2025-01-10"
+  })
+  rev6: review_insert(data: {
+    id: 6, restaurantId: 2, rating: 3, content: "It's pizza. It's fine.", 
+    createdAt: "2025-02-01T18:00:00Z", visitDate: "2025-02-01"
+  })
+  rev7: review_insert(data: {
+    id: 7, restaurantId: 2, rating: 2, content: "Cold when it arrived.", 
+    createdAt: "2025-02-02T19:00:00Z", visitDate: "2025-02-02"
+  })
+  rev8: review_insert(data: {
+    id: 8, restaurantId: 2, rating: 5, content: "My kids love the arcade!", 
+    createdAt: "2025-02-03T12:00:00Z", visitDate: "2025-02-03"
+  })
+  rev9: review_insert(data: {
+    id: 9, restaurantId: 2, rating: 1, content: "SPAM SPAM SPAM Visit mywebsite.com for free prizes", 
+    createdAt: "2025-02-04T00:00:00Z", visitDate: "2025-02-04"
+  })
+  rev10: review_insert(data: {
+    id: 10, restaurantId: 2, rating: 4, content: "Pepperoni was crispy.", 
+    createdAt: "2025-02-05T20:00:00Z", visitDate: "2025-02-05"
+  })
+  rev11: review_insert(data: {
+    id: 11, restaurantId: 2, rating: 3.5, content: "Decent value for the price.", 
+    createdAt: "2025-02-06T18:30:00Z", visitDate: "2025-02-06"
+  })
+  rev12: review_insert(data: {
+    id: 12, restaurantId: 2, rating: 1, content: "Found a hair in my soda.", 
+    createdAt: "2025-02-07T13:00:00Z", visitDate: "2025-02-07"
+  })
+  rev13: review_insert(data: {
+    id: 13, restaurantId: 3, rating: 5, content: "Bring this place back!", 
+    createdAt: "2023-05-01T12:00:00Z", visitDate: "2023-04-20"
+  })
+  rev14: review_insert(data: {
+    id: 14, restaurantId: 3, rating: 5, content: "Best tacos ever.", 
+    createdAt: "2023-05-02T12:00:00Z", visitDate: "2023-04-21"
+  })
+  
+  # EDGE CASES
+  rev15: review_insert(data: {
+    id: 15, restaurantId: 1, rating: 3, content: "¯\\_(ツ)_/¯ It was okay.", 
+    createdAt: "2025-03-01T10:00:00Z", visitDate: "2025-03-01"
+  })
+  rev16: review_insert(data: {
+    id: 16, restaurantId: 2, rating: 4, content: "100% Recommended! $$$", 
+    createdAt: "2025-03-02T10:00:00Z", visitDate: "2025-03-02"
+  })
+  rev17: review_insert(data: {
+    id: 17, restaurantId: 2, rating: 0, content: "Worst. Experience. Ever.", 
+    createdAt: "2025-03-03T10:00:00Z", visitDate: "2025-03-03"
+  })
+  rev18: review_insert(data: {
+    id: 18, restaurantId: 1, rating: 2.5, content: null, 
+    createdAt: "2025-03-04T10:00:00Z", visitDate: "2025-03-04"
+  })
+}

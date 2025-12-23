@@ -22,4 +22,4 @@ schema:
       database: "your-database"
       cloudSql:
         instanceId: "your-instance-id"
-connectorDirs: ["./movie-connector"]
+connectorDirs: ["./restaurant-connector"]

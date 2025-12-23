@@ -1,0 +1,183 @@
+
+# BASIC
+
+# 1. Hello World
+query HelloWorld @auth(level: PUBLIC) {
+  greeting: _selectFirst(sql: "SELECT 'Hello from Raw SQL' as message")
+}
+
+# 2. Basic List & Filter
+query ListActiveRestaurants @auth(level: PUBLIC) {
+  restaurants: _select(
+    sql: "SELECT id, name, metadata FROM restaurant WHERE active = true ORDER BY name ASC"
+  )
+}
+
+# 3. Parameter Injection
+query FilterReviewsByRating($minRating: Float!) @auth(level: PUBLIC) {
+  topReviews: _select(
+    sql: "SELECT content, rating, created_at FROM review WHERE rating >= $1 ORDER BY rating DESC",
+    params: [$minRating]
+  )
+}
+
+# ANALYTICS
+
+# 4. Complex Joins & Aggregates
+query RestaurantAnalytics @auth(level: PUBLIC) {
+  stats: _select(
+    sql: """
+      SELECT
+        r.name,
+        COUNT(rv.id) as review_count,
+        ROUND(AVG(rv.rating)::numeric, 1) as avg_rating
+      FROM restaurant r
+      LEFT JOIN review rv ON r.id = rv.restaurant_id
+      WHERE r.active = true
+      GROUP BY r.id, r.name
+      ORDER BY avg_rating DESC NULLS LAST
+    """
+  )
+}
+
+# 5. Advanced Search (Regex & Arrays)
+query AdvancedSearch($pattern: String!, $ids: [Int!]!) @auth(level: PUBLIC) {
+  byName: _select(
+    sql: "SELECT id, name FROM restaurant WHERE name ~* $1", 
+    params: [$pattern]
+  )
+  byIds: _select(
+    sql: "SELECT name FROM restaurant WHERE id = ANY($1)", 
+    params: [$ids]
+  )
+}
+
+# TYPE MAPPPING
+
+# 6. Type Mapping Limits
+query TypeMappingTest @auth(level: USER) {
+  _selectFirst(
+    sql: """
+      SELECT 
+        100 as int_val,
+        3.14159 as float_val,
+        true as bool_val,
+        'Hello World' as str_val,
+        NULL as null_val,
+        '{"key": "value", "nested": [1, 2]}'::jsonb as json_val,
+        ARRAY[1, 2, 3] as int_array,
+        ARRAY['a', 'b', 'c'] as str_array
+    """
+  )
+}
+
+# 7. Postgres Syntax (Casting & Array Ops)
+query PostgresFeatures @auth(level: PUBLIC) {
+  _select(
+    sql: """
+      SELECT name 
+      FROM restaurant 
+      WHERE 
+        'fast_food' = ANY(tags)
+        OR 
+        (metadata::jsonb)->>'type' = 'chain'
+    """
+  )
+}
+
+# 8. Parser Resilience (Quotes & Comments)
+query ParserEdgeCases @auth(level: PUBLIC) {
+  _selectFirst(
+    sql: """
+      SELECT 
+        'SELECT * FROM users' as fake_query, 
+        '-- This is not a comment' as dashes,
+        '/* nor this */' as block,
+        $$Dollar Quoted String$$ as dollar_text
+    """
+  )
+}
+
+# 9. Window Functions & CTEs
+query AdvancedAnalytics @auth(level: PUBLIC) {
+  _select(
+    sql: """
+      WITH RestaurantStats AS (
+        SELECT restaurant_id, AVG(rating) as avg_r 
+        FROM review 
+        GROUP BY restaurant_id
+      )
+      SELECT 
+        r.name, 
+        s.avg_r,
+        RANK() OVER (ORDER BY s.avg_r DESC) as rank
+      FROM restaurant r
+      JOIN RestaurantStats s ON r.id = s.restaurant_id
+    """
+  )
+}
+
+#AUTHENTICATION
+
+# 10. Public Access Check
+# Expected: Success (if run anonymously)
+query AuthPublicTest @auth(level: PUBLIC) {
+  result: _selectFirst(sql: "SELECT 'I am public' as msg")
+}
+
+# 11. User Access Check
+# Expected: Fail (if unauthenticated), Success (if logged in)
+query AuthUserTest @auth(level: USER) {
+  # Note: In real scenarios, you'd use request.auth.uid here
+  result: _selectFirst(sql: "SELECT 'I am a User' as msg")
+}
+
+# 12. Admin Access Check
+# Expected: Fail (unless using Admin SDK or Emulator Admin override)
+query AuthAdminTest @auth(level: NO_ACCESS) {
+  result: _selectFirst(sql: "SELECT 'I am an Admin")
+}
+
+# EDGE & BOUNDARY CASES
+
+# 13. Null Handling
+query NullHandlingTest @auth(level: PUBLIC) {
+  results: _select(
+    sql: """
+      SELECT 
+        id, 
+        COALESCE(content, 'NO CONTENT PROVIDED') as safe_content,
+        CASE WHEN content IS NULL THEN true ELSE false END as is_empty
+      FROM review
+      WHERE content IS NULL OR id < 5
+    """
+  )
+}
+
+# 14. Date Logic
+query RecentActivity @auth(level: PUBLIC) {
+  results: _select(
+    sql: """
+      SELECT 
+        id,
+        created_at,
+        EXTRACT(DAY FROM (NOW() - created_at)) as days_since_review
+      FROM review
+      WHERE created_at > (NOW() - INTERVAL '30 days')
+    """
+  )
+}
+
+# 15. Dynamic Ordering
+query DynamicLogic($sortMode: String!) @auth(level: PUBLIC) {
+  results: _select(
+    sql: """
+      SELECT id, rating, content
+      FROM review
+      ORDER BY 
+        CASE WHEN $1 = 'rating' THEN rating END DESC,
+        CASE WHEN $1 = 'id' THEN id END ASC
+    """,
+    params: [$sortMode]
+  )
+}

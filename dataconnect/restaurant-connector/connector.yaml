@@ -12,9 +12,9 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
 
-connectorId: movie-connector
+connectorId: restaurant-connector
 generate:
   javascriptSdk:
-    package: "@movie/dataconnect"
+    package: "@restaurant/dataconnect"
     outputDir: ../../app/src/lib/dataconnect-sdk
     packageJsonDir: "../../app"

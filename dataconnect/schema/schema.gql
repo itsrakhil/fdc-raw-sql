@@ -11,32 +11,24 @@
  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  # See the License for the specific language governing permissions and
  # limitations under the License.
+# Copyright 2024 Google LLC
+type Restaurant @table {
+  id: Int! @col(dataType: "serial")
+  name: String!
+  ownerUid: String
+  active: Boolean!
+  # Metadata for testing JSON handling (e.g. { "type": "cafe" })
+  metadata: Any 
+  # Tags for testing Array handling (e.g. ["coffee", "wifi"])
+  tags: [String] 
+}
 
-# Movies
-# TODO: Fill out Movie table
-
-# Movie Metadata
-# Movie - MovieMetadata is a one-to-one relationship
-# TODO: Fill out MovieMetadata table
-
-# Actors
-# Suppose an actor can participate in multiple movies and movies can have multiple actors
-# Movie - Actors (or vice versa) is a many to many relationship
-# TODO: Fill out Actor table
-
-# Join table for many-to-many relationship for movies and actors
-# The 'key' param signifies the primary key(s) of this table
-# In this case, the keys are [movieId, actorId], the generated fields of the reference types [movie, actor]
-# TODO: Fill out MovieActor table
-
-# Users
-# Suppose a user can leave reviews for movies
-# user-reviews is a one to many relationship, movie-reviews is a one to many relationship, movie:user is a many to many relationship
-# TODO: Fill out User table
-
-# Join table for many-to-many relationship for users and favorite movies
-# TODO: Fill out FavoriteMovie table
-
-# Reviews
-# TODO: Fill out Review table
-
+type Review @table {
+  id: Int! @col(dataType: "serial")
+  restaurantId: Int!
+  rating: Float!
+  content: String
+  createdAt: Timestamp
+  # Date type for testing non-timestamp date logic
+  visitDate: Date 
+}
