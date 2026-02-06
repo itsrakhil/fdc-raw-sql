@@ -1,115 +1,99 @@
-# BASIC
-
-# 1. Update with RETURNING (Edit & Fetch)
-mutation EditReviewContent($id: Int!, $newContent: String!) @auth(level: USER) {
-  updatedReview: _selectFirst(
-    sql: """
-      UPDATE review 
-      SET content = $2 
-      WHERE id = $1 
-      RETURNING id, content, rating
-    """, 
-    params: [$id, $newContent]
-  )
+# Basic Insert
+mutation BasicInsert @auth(level: NO_ACCESS) {
+  _executeReturningFirst(sql: "INSERT INTO restaurant (name, active) VALUES ('Simpjlej Resto1', true) RETURNING id, name")
 }
 
-# 2. Bulk Delete (Execute only)
-mutation DeleteSpamReviews($keyword: String!) @auth(level: USER) {
+# Complex Insert
+mutation InsertComplex($name: String!, $meta: Any!, $tags: [String!]) @auth(level: NO_ACCESS) {
   _execute(
-    sql: "DELETE FROM review WHERE content LIKE '%' || $1 || '%'",
-    params: [$keyword]
+    sql: "INSERT INTO restaurant (name, active, metadata, tags) VALUES ($1, true, $2, $3)",
+    params: [$name, $meta, $tags]
   )
 }
 
-# 3. Soft Delete Pattern
-mutation SoftDeleteRestaurant($id: Int!) @auth(level: USER) {
-  _selectFirst(
-    sql: """
-      UPDATE restaurant 
-      SET active = false 
-      WHERE id = $1 
-      RETURNING id, name, active
-    """,
-    params: [$id]
-  )
+# Bulk Insert
+mutation BulkInsert @auth(level: NO_ACCESS) {
+  _execute(sql: "INSERT INTO restaurant (name, active) VALUES ('A', true), ('B', false)")
 }
 
-# ADVANCED LOGIC
-
-# 4. Transaction Simulation (Move Foreign Key)
-mutation MoveReview($reviewId: Int!, $newRestaurantId: Int!) @auth(level: USER) {
-  _selectFirst(
-    sql: "UPDATE review SET restaurant_id = $2 WHERE id = $1 RETURNING *",
-    params: [$reviewId, $newRestaurantId]
-  )
+# Insert from Select
+mutation CopyInsert @auth(level: NO_ACCESS) {
+  _execute(sql: "INSERT INTO restaurant (name, active) SELECT name || '_Copy', active FROM restaurant WHERE id=1")
 }
 
-# 5. JSON Column Update (Full Object Replacement)
-mutation UpdateMetadata($id: Int!, $newMeta: Any!) @auth(level: USER) {
-  _selectFirst(
-    sql: "UPDATE restaurant SET metadata = $2 WHERE id = $1 RETURNING metadata",
-    params: [$id, $newMeta]
-  )
-}
-
-# 6. Date Interval Math
-mutation ExtendSubscription @auth(level: USER) {
+# Upsert
+mutation Upsert($id: Int!, $name: String!) @auth(level: NO_ACCESS) {
   _execute(
-    sql: "UPDATE review SET created_at = created_at + INTERVAL '1 month' WHERE rating > 4"
+    sql: "INSERT INTO restaurant (id, name, active) VALUES ($1, $2, true) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name",
+    params: [$id, $name]
   )
 }
 
-# 7. Upsert (Insert ON CONFLICT Update)
-mutation UpsertReview($id: Int!, $content: String!) @auth(level: USER) {
-  _selectFirst(
-    sql: """
-      INSERT INTO review (id, restaurant_id, rating, content)
-      VALUES ($1, 1, 5, $2)
-      ON CONFLICT (id) 
-      DO UPDATE SET content = EXCLUDED.content
-      RETURNING id, content, 'upserted' as action
-    """,
-    params: [$id, $content]
+# Basic Update
+mutation BasicUpdate($id: Int) @auth(level: NO_ACCESS) {
+  _execute(sql: "UPDATE restaurant SET active = false WHERE id = $1", params: [$id])
+}
+
+# Multi-column Update
+mutation UpdateMulti($id: Int!, $name: String!, $active: Boolean!) @auth(level: NO_ACCESS) {
+  _execute(sql: "UPDATE restaurant SET name=$2, active=$3 WHERE id=$1", params: [$id, $name, $active])
+}
+
+# Update via Join
+mutation UpdateJoin @auth(level: NO_ACCESS) {
+  _execute(sql: "UPDATE restaurant SET active=false WHERE id IN (SELECT restaurant_id FROM review WHERE rating < 2)")
+}
+
+# Update Zero Rows
+mutation UpdateNone @auth(level: NO_ACCESS) {
+  _execute(sql: "UPDATE restaurant SET active=false WHERE id = -999")
+}
+
+# Basic Delete
+mutation BasicDelete($id: Int) @auth(level: NO_ACCESS) {
+  _execute(sql: "DELETE FROM restaurant WHERE id = $1", params: [$id])
+}
+
+# Delete Many
+mutation DeleteMany @auth(level: NO_ACCESS) {
+  _execute(sql: "DELETE FROM restaurant WHERE name LIKE '%Copy%'")
+}
+
+# ------------------------------------------------------------------------------
+# RETURNING MUTATIONS
+# ------------------------------------------------------------------------------
+
+# Insert Returning First
+mutation InsertReturnOne($name: String!) @auth(level: NO_ACCESS) {
+  _executeReturningFirst(
+    sql: "INSERT INTO restaurant (name, active) VALUES ($1, true) RETURNING id, name",
+    params: [$name]
   )
 }
 
-# COMPLEX & CTEs
-
-# 8. Atomic Nuke (Multi-table CTE Delete)
-mutation NuclearDeleteRestaurant($id: Int!) @auth(level: USER) {
-  _execute(
-    sql: """
-      WITH deleted_reviews AS (
-        DELETE FROM review WHERE restaurant_id = $1 RETURNING id
-      )
-      DELETE FROM restaurant WHERE id = $1
-    """,
-    params: [$id]
+# Update Returning
+mutation UpdateReturnMany @auth(level: NO_ACCESS) {
+  _executeReturning(
+    sql: "UPDATE review SET rating = rating + 0.1 WHERE rating < 3 RETURNING id, rating"
   )
 }
 
-# 9. Array Appending (Postgres Specific)
-mutation AddTag($id: Int!, $tag: String!) @auth(level: USER) {
-  _selectFirst(
-    sql: """
-      UPDATE restaurant 
-      SET tags = array_append(tags, $2) 
-      WHERE id = $1 
-      RETURNING tags
-    """,
-    params: [$id, $tag]
+# Delete Returning
+mutation DeleteReturnMany @auth(level: NO_ACCESS) {
+  _executeReturning(
+    sql: "DELETE FROM review WHERE content IS NULL RETURNING id"
   )
 }
 
-# SECURITY
-
-# 10. Secure Update (Owns Resource)
-# Test: Update Restaurant
-# Expected: SUCCESS with authenticated and FAILURE otherwise.
-mutation SecureUpdateMyRestaurant($id: Int!, $active: Boolean!) @auth(level: USER) {
-  _selectFirst(
-    sql: "UPDATE restaurant SET active = $2 WHERE id = $1 AND owner_uid = $3 RETURNING id, active, owner_uid",
-    # $3 is securely injected from the Auth Token
-    params: [$id, $active, {_expr: "auth.uid"}]
+# Update with Auth Context
+mutation UpdateAuth($id: Int!, $name: String!) @auth(level: USER) {
+  _executeReturningFirst(
+    sql: "UPDATE restaurant SET name=$2 WHERE id=$1 AND owner_uid=$3 RETURNING *",
+    params: [$id, $name, {_expr: "auth.uid"}]
   )
+}
+
+# Invalid JSON
+mutation BadJson @auth(level: NO_ACCESS) {
+  _execute(sql: "INSERT INTO restaurant (name, active, metadata) VALUES ('BadJsonResto', true, '{bad_json: }')")
 }
