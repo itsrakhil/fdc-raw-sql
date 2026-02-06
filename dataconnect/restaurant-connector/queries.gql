@@ -1,183 +1,190 @@
-
-# BASIC
-
-# 1. Hello World
-query HelloWorld @auth(level: PUBLIC) {
-  greeting: _selectFirst(sql: "SELECT 'Hello from Raw SQL' as message")
+# List All Restaurants (Raw SQL)
+query ListAllRestaurants @auth(level: PUBLIC, insecureReason: "This query is safe to expose to the public") {
+  _select(sql: "SELECT id, name, owner_uid, active, metadata, tags FROM restaurant")
 }
 
-# 2. Basic List & Filter
-query ListActiveRestaurants @auth(level: PUBLIC) {
-  restaurants: _select(
-    sql: "SELECT id, name, metadata FROM restaurant WHERE active = true ORDER BY name ASC"
-  )
+# Basic Select All (GraphQL Fields)
+query SelectAll @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  restaurants {
+    id
+    name
+    ownerUid
+    active
+    metadata
+    tags
+  }
 }
 
-# 3. Parameter Injection
-query FilterReviewsByRating($minRating: Float!) @auth(level: PUBLIC) {
-  topReviews: _select(
-    sql: "SELECT content, rating, created_at FROM review WHERE rating >= $1 ORDER BY rating DESC",
-    params: [$minRating]
-  )
+# Select with Aliases
+query SelectAliases @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  _select(sql: "SELECT name AS restaurant_name, active AS is_open FROM restaurant")
 }
 
-# ANALYTICS
-
-# 4. Complex Joins & Aggregates
-query RestaurantAnalytics @auth(level: PUBLIC) {
-  stats: _select(
-    sql: """
-      SELECT
-        r.name,
-        COUNT(rv.id) as review_count,
-        ROUND(AVG(rv.rating)::numeric, 1) as avg_rating
-      FROM restaurant r
-      LEFT JOIN review rv ON r.id = rv.restaurant_id
-      WHERE r.active = true
-      GROUP BY r.id, r.name
-      ORDER BY avg_rating DESC NULLS LAST
-    """
-  )
+# Select Distinct
+query SelectDistinct @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT DISTINCT id FROM review")
 }
 
-# 5. Advanced Search (Regex & Arrays)
-query AdvancedSearch($pattern: String!, $ids: [Int!]!) @auth(level: PUBLIC) {
-  byName: _select(
-    sql: "SELECT id, name FROM restaurant WHERE name ~* $1", 
-    params: [$pattern]
-  )
-  byIds: _select(
-    sql: "SELECT name FROM restaurant WHERE id = ANY($1)", 
-    params: [$ids]
-  )
+# Case Statements
+query CaseStatement @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT name, CASE WHEN active THEN 'OPEN' ELSE 'CLOSED' END as status FROM restaurant")
 }
 
-# TYPE MAPPPING
-
-# 6. Type Mapping Limits
-query TypeMappingTest @auth(level: USER) {
-  _selectFirst(
-    sql: """
-      SELECT 
-        100 as int_val,
-        3.14159 as float_val,
-        true as bool_val,
-        'Hello World' as str_val,
-        NULL as null_val,
-        '{"key": "value", "nested": [1, 2]}'::jsonb as json_val,
-        ARRAY[1, 2, 3] as int_array,
-        ARRAY['a', 'b', 'c'] as str_array
-    """
-  )
-}
-
-# 7. Postgres Syntax (Casting & Array Ops)
-query PostgresFeatures @auth(level: PUBLIC) {
+# Where Clause with Operators & Params
+query WhereOperators($namePattern: String!, $minRating: Float!) @auth(level: NO_ACCESS) {
   _select(
-    sql: """
-      SELECT name 
-      FROM restaurant 
-      WHERE 
-        'fast_food' = ANY(tags)
-        OR 
-        (metadata::jsonb)->>'type' = 'chain'
-    """
+    sql: "SELECT * FROM restaurant r JOIN review v ON r.id = v.id WHERE r.name LIKE $1 AND v.rating >= $2",
+    params: [$namePattern, $minRating]
   )
 }
 
-# 8. Parser Resilience (Quotes & Comments)
-query ParserEdgeCases @auth(level: PUBLIC) {
-  _selectFirst(
-    sql: """
-      SELECT 
-        'SELECT * FROM users' as fake_query, 
-        '-- This is not a comment' as dashes,
-        '/* nor this */' as block,
-        $$Dollar Quoted String$$ as dollar_text
-    """
-  )
+# Where with Subquery
+query Subquery @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE id IN (SELECT id FROM review WHERE rating = 5.0)")
 }
 
-# 9. Window Functions & CTEs
-query AdvancedAnalytics @auth(level: PUBLIC) {
+# Null Parameter Handling
+query NullParam($content: String) @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM review WHERE content IS NULL OR content = $1", params: [$content])
+}
+
+# Inner Join
+query InnerJoin @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT r.name, v.content FROM restaurant r INNER JOIN review v ON r.id = v.id")
+}
+
+# Complex Ordering
+query ComplexOrder @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM review ORDER BY rating DESC, visit_date ASC NULLS LAST")
+}
+
+# Window Functions (Rank)
+query WindowFunction @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT id, rating, RANK() OVER (PARTITION BY id ORDER BY rating DESC) as rank FROM review")
+}
+
+# Type Casting
+query TypeCast @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT id::TEXT as id_str, rating::INTEGER as rating_int FROM review")
+}
+
+# Date Functions
+query DateMath @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT visit_date, visit_date + INTERVAL '7 days' as next_week FROM review")
+}
+
+# Zero Rows
+query ZeroRows @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE name LIKE '%Cuppa%'")
+}
+
+# Scalar Params
+query ScalarParams(
+  $active: Boolean!
+  $id: Int!
+  $rating: Float!
+  $name: String!
+) @auth(level: PUBLIC) {
   _select(
-    sql: """
-      WITH RestaurantStats AS (
-        SELECT restaurant_id, AVG(rating) as avg_r 
-        FROM review 
-        GROUP BY restaurant_id
-      )
-      SELECT 
-        r.name, 
-        s.avg_r,
-        RANK() OVER (ORDER BY s.avg_r DESC) as rank
-      FROM restaurant r
-      JOIN RestaurantStats s ON r.id = s.restaurant_id
-    """
+    sql: "SELECT * FROM restaurant WHERE active = $1 AND id = $2 AND name = $4",
+    params: [$active, $id, $rating, $name]
   )
 }
 
-#AUTHENTICATION
-
-# 10. Public Access Check
-# Expected: Success (if run anonymously)
-query AuthPublicTest @auth(level: PUBLIC) {
-  result: _selectFirst(sql: "SELECT 'I am public' as msg")
+# Array Params (SQL IN)
+query ArrayParams($ids: [Int!]) @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE id = ANY($1)", params: [$ids])
 }
 
-# 11. User Access Check
-# Expected: Fail (if unauthenticated), Success (if logged in)
-query AuthUserTest @auth(level: USER) {
-  # Note: In real scenarios, you'd use request.auth.uid here
-  result: _selectFirst(sql: "SELECT 'I am a User' as msg")
+# Unused Param and Invalid Select
+query UnusedParamAndInvalidSelect($id: Int!) @auth(level: PUBLIC) {
+  _select(sql: "SELECT hakjdsh", params: [$id])
 }
 
-# 12. Admin Access Check
-# Expected: Fail (unless using Admin SDK or Emulator Admin override)
-query AuthAdminTest @auth(level: NO_ACCESS) {
-  result: _selectFirst(sql: "SELECT 'I am an Admin")
+# Invalid Select (DDL)
+query InvalidSelect {
+  _select(sql: "CREATE TABLE bad (id INT)")
 }
 
-# EDGE & BOUNDARY CASES
+# ------------------------------------------------------------------------------
+# SINGLE RESULT QUERIES
+# ------------------------------------------------------------------------------
 
-# 13. Null Handling
-query NullHandlingTest @auth(level: PUBLIC) {
-  results: _select(
-    sql: """
-      SELECT 
-        id, 
-        COALESCE(content, 'NO CONTENT PROVIDED') as safe_content,
-        CASE WHEN content IS NULL THEN true ELSE false END as is_empty
-      FROM review
-      WHERE content IS NULL OR id < 5
-    """
-  )
+# Select One Row
+query SelectOne($id: Int) @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "SELECT * FROM restaurant WHERE id = $1", params: [$id])
 }
 
-# 14. Date Logic
-query RecentActivity @auth(level: PUBLIC) {
-  results: _select(
-    sql: """
-      SELECT 
-        id,
-        created_at,
-        EXTRACT(DAY FROM (NOW() - created_at)) as days_since_review
-      FROM review
-      WHERE created_at > (NOW() - INTERVAL '30 days')
-    """
-  )
+# Select First of Many
+query SelectFirstOfMany @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "SELECT * FROM restaurant ORDER BY id ASC")
 }
 
-# 15. Dynamic Ordering
-query DynamicLogic($sortMode: String!) @auth(level: PUBLIC) {
-  results: _select(
-    sql: """
-      SELECT id, rating, content
-      FROM review
-      ORDER BY 
-        CASE WHEN $1 = 'rating' THEN rating END DESC,
-        CASE WHEN $1 = 'id' THEN id END ASC
-    """,
-    params: [$sortMode]
-  )
+# Select First Null
+query SelectFirstNull @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "SELECT * FROM restaurant WHERE id = -999")
+}
+
+# Aggregates
+query Aggregates @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "SELECT COUNT(*) as total, AVG(rating) as average FROM review")
+}
+
+# CTE
+query CTE @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "WITH TopReviews AS (SELECT restaurant_id FROM review WHERE rating=5) SELECT * FROM restaurant WHERE id IN (SELECT * FROM TopReviews) LIMIT 1")
+}
+
+# JSON Result Structure
+query JsonStructure @auth(level: NO_ACCESS) {
+  _selectFirst(sql: "SELECT metadata FROM restaurant WHERE metadata IS NOT NULL LIMIT 1")
+}
+
+# ------------------------------------------------------------------------------
+# ERROR & SECURITY SCENARIOS
+# ------------------------------------------------------------------------------
+
+# Syntax Error
+query SyntaxError @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant")
+}
+
+# Missing Table
+query MissingTable @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM MissingTable")
+}
+
+# Missing Column
+query MissingCol @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT badCol FROM restaurant")
+}
+
+# Type Mismatch (DB Level)
+query TypeMismatch @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE id = 'abc'")
+}
+
+# Div By Zero
+query DivZero @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT 10/0")
+}
+
+# Param Count Mismatch
+query ParamCountMismatch @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE id = $1 AND name = $2", params: [1])
+}
+
+# Param Type Mismatch (Client)
+query ParamTypeMismatch($id: String) @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT * FROM restaurant WHERE id = $1", params: [$id])
+}
+
+# DML in Select
+query DMLinSelect @auth(level: NO_ACCESS) {
+  _select(sql: "DELETE FROM restaurant WHERE id=1")
+}
+
+# Oversized Response
+query OversizedResponse @auth(level: NO_ACCESS) {
+  _select(sql: "SELECT a.id, b.id FROM review a CROSS JOIN review b CROSS JOIN review c LIMIT 1000000000000000000000000000000000")
 }
