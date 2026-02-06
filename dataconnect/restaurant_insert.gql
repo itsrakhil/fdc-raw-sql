@@ -1,6 +1,3 @@
-# Copyright 2024 Google LLC
-# Licensed under the Apache License, Version 2.0.
-
 mutation SeedRestaurants {
   # RESTAURANTS
   
@@ -9,7 +6,7 @@ mutation SeedRestaurants {
   r1: restaurant_insert(data: {
     id: 1, 
     name: "Cuppa Joe", 
-    ownerUid: "exampleUserId",   # <--- CRITICAL CHANGE FOR TESTING
+    ownerUid: "exampleUserId",   
     active: true,
     metadata: { type: "cafe", wifi: true, seating: 20 }, 
     tags: ["coffee", "breakfast", "cozy"]
